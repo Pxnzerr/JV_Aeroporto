@@ -7,16 +7,19 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public class GerenciadorPistas {
     private final Deque<Voo> filaDecolagem;
     private final Deque<Voo> filaPouso;
     private final int quantidadePistasDisponiveis;
+    private int pistasEmUso;
 
     public GerenciadorPistas(int quantidadePistasDisponiveis) {
         this.quantidadePistasDisponiveis = quantidadePistasDisponiveis;
         this.filaDecolagem = new ArrayDeque<>();
         this.filaPouso = new ArrayDeque<>();
+        this.pistasEmUso = 0;
     }
 
     public void agendarVoo(Voo voo) {
@@ -31,21 +34,29 @@ public class GerenciadorPistas {
     }
 
     public Voo liberarProximoVoo() {
-        if (quantidadePistasDisponiveis <= 0) {
+        if (pistasEmUso >= quantidadePistasDisponiveis) {
             throw new RecursoIndisponivelException("Nenhuma pista disponível no momento.");
         }
-        Optional<Voo> proximo = Optional.ofNullable(filaPouso.peekFirst());
-        if (proximo.isEmpty()) {
-            proximo = Optional.ofNullable(filaDecolagem.peekFirst());
+        Voo proximo = filaPouso.pollFirst();
+        if (proximo == null) {
+            proximo = filaDecolagem.pollFirst();
         }
-        return proximo.orElseThrow(() -> new RecursoIndisponivelException("Nenhum voo aguardando liberação."));
+        if (proximo == null) {
+            throw new RecursoIndisponivelException("Nenhum voo aguardando liberação.");
+        }
+        pistasEmUso++;
+        return proximo;
     }
 
     public boolean removerVoo(Voo voo) {
-        return filaPouso.remove(voo) || filaDecolagem.remove(voo);
+        boolean removido = filaPouso.remove(voo) || filaDecolagem.remove(voo);
+        if (removido && pistasEmUso > 0) {
+            pistasEmUso--;
+        }
+        return removido;
     }
 
     public List<Voo> listarVoosEspera() {
-        return List.copyOf(filaPouso.stream().toList());
+        return List.copyOf(Stream.concat(filaPouso.stream(), filaDecolagem.stream()).toList());
     }
 }
